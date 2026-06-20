@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/auth";
+import { GlobalSearch } from "@/components/GlobalSearch";
 
 const NAV_ITEMS = [
   { path: "/", icon: LayoutDashboard, label: "总览看板", desc: "核心数据概览" },
@@ -215,10 +216,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             variant="ghost"
             color="#94a3b8"
             onClick={onOpen}
+            flexShrink={0}
           />
-          <Text fontSize="md" fontWeight={700} color="#e2e8f0" ml={3}>
+          <Text fontSize="md" fontWeight={700} color="#e2e8f0" ml={3} display={{ base: "none", sm: "block" }}>
             博彩用户行为分析看板
           </Text>
+          <Box flex={1} display="flex" justifyContent="flex-end" ml={3}>
+            <GlobalSearch size="sm" />
+          </Box>
         </Box>
         <Drawer isOpen={isOpen} placement="left" onClose={onClose} size="70%">
           <DrawerOverlay backdropFilter="blur(4px)" />
@@ -240,9 +245,35 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <Box w="260px" flexShrink={0} borderRight="1px solid rgba(30, 38, 64, 0.6)">
         <Sidebar />
       </Box>
-      <Box flex={1} overflowY="auto" p={6} bg="#070a13">
-        {children}
-      </Box>
+      <VStack flex={1} align="stretch" spacing={0} overflow="hidden">
+        <Box
+          as="header"
+          h="64px"
+          display="flex"
+          alignItems="center"
+          px={6}
+          borderBottom="1px solid rgba(30, 38, 64, 0.6)"
+          bg="rgba(10, 14, 24, 0.9)"
+          backdropFilter="blur(8px)"
+          position="sticky"
+          top={0}
+          zIndex={10}
+          flexShrink={0}
+        >
+          <VStack align="stretch" spacing={0} flex={1}>
+            <Text fontSize="sm" fontWeight={700} color="#e2e8f0">
+              博彩用户行为分析看板
+            </Text>
+            <Text fontSize="10px" color="#64748b">
+              Betting User Behavior Analytics
+            </Text>
+          </VStack>
+          <GlobalSearch size="md" />
+        </Box>
+        <Box flex={1} overflowY="auto" p={6} bg="#070a13">
+          {children}
+        </Box>
+      </VStack>
     </HStack>
   );
 }

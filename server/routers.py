@@ -100,6 +100,28 @@ def users():
     return {"items": SYSTEM_USERS}
 
 
+@router.get("/users/search")
+def search_users(q: str = Query("", alias="q"), limit: int = 10):
+    keyword = (q or "").strip().lower()
+    if not keyword:
+        return {"items": []}
+    matched = []
+    for u in USERS:
+        uid = str(u.get("user_id", "")).lower()
+        nick = str(u.get("nickname", "")).lower()
+        if keyword in uid or keyword in nick:
+            matched.append({
+                "userId": u["user_id"],
+                "nickname": u["nickname"],
+                "tier": u["tier"],
+                "tierName": TIER_NAMES[u["tier"]],
+                "channel": u["channel"],
+            })
+            if len(matched) >= limit:
+                break
+    return {"items": matched}
+
+
 @router.put("/users/{user_id}")
 def update_user(user_id: int, body: dict):
     su = next((u for u in SYSTEM_USERS if u["id"] == user_id), None)

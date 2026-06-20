@@ -232,3 +232,15 @@ export interface LogsResponse {
   page: number;
   size: number;
 }
+
+export interface SearchUserResult {
+  userId: string;
+  nickname: string;
+  tier: string;
+  tierName: string;
+  channel: string;
+}
+
+export interface SearchUserResponse {
+  items: SearchUserResult[];
+}

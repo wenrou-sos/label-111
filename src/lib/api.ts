@@ -11,6 +11,7 @@ import type {
   LogsResponse,
   SystemUser,
   Intervention,
+  SearchUserResponse,
 } from "@/types";
 
 const http = axios.create({
@@ -102,6 +103,11 @@ export const api = {
 
   async logs(page = 1, size = 20): Promise<LogsResponse> {
     const res = await http.get("/logs", { params: { page, size } });
+    return res.data;
+  },
+
+  async searchUsers(q: string, limit = 10): Promise<SearchUserResponse> {
+    const res = await http.get("/users/search", { params: buildParams({ q, limit }) });
     return res.data;
   },
 

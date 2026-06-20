@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   VStack,
   SimpleGrid,
@@ -43,6 +43,7 @@ import {
   ChevronRight,
   Shield,
 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useFilterStore } from "@/stores/filter";
 import { useAuthStore } from "@/stores/auth";
@@ -72,6 +73,10 @@ export default function Monitor() {
   const [intervening, setIntervening] = useState(false);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
+  const targetUserId = searchParams.get("userId") || "";
+  const scrollRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const highlightHandled = useRef<string>("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -96,6 +101,22 @@ export default function Monitor() {
     const timer = setInterval(fetchData, 300000);
     return () => clearInterval(timer);
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!targetUserId || highlightHandled.current === targetUserId) return;
+    if (!data) return;
+    highlightHandled.current = targetUserId;
+    const el = scrollRefs.current[targetUserId];
+    if (el) {
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    }
+  }, [data, targetUserId]);
+
+  useEffect(() => {
+    highlightHandled.current = "";
+  }, [targetUserId]);
 
   const handleIntervene = async () => {
     if (!selectedUser) return;
@@ -224,6 +245,25 @@ export default function Monitor() {
             </Box>
           </Alert>
 
+          {targetUserId && data && !data.users.some((u) => u.userId === targetUserId) && (
+            <Alert
+              status="info"
+              bg="rgba(6, 182, 212, 0.08)"
+              border="1px solid rgba(6, 182, 212, 0.25)"
+              borderRadius="12px"
+            >
+              <AlertIcon color="#06B6D4" />
+              <Box flex={1}>
+                <AlertTitle fontSize="sm" color="#06B6D4">
+                  用户 {targetUserId} 不在异常监控列表中
+                </AlertTitle>
+                <AlertDescription fontSize="xs" color="#94a3b8">
+                  该用户未检测到异常投注行为，如有需要请调整时间范围后重试。
+                </AlertDescription>
+              </Box>
+            </Alert>
+          )}
+
           <ChartCard
             title={`异常用户列表 (${data.users.length})`}
             subtitle="点击操作列可发起责任博彩干预"
@@ -246,12 +286,25 @@ export default function Monitor() {
                 <Tbody>
                   {data.users.map((u) => {
                     const iv = interventions[u.userId];
+                    const isTarget = u.userId === targetUserId;
                     return (
                       <Tr
                         key={u.userId}
+                        ref={(el) => { scrollRefs.current[u.userId] = el; }}
+                        tabIndex={isTarget ? 0 : undefined}
                         borderBottom="1px solid rgba(30, 38, 64, 0.4)"
-                        bg={u.reasons.length >= 2 ? "rgba(255, 181, 71, 0.05)" : "transparent"}
-                        _hover={{ bg: "rgba(0, 217, 192, 0.03)" }}
+                        bg={
+                          isTarget
+                            ? "rgba(0, 217, 192, 0.15)"
+                            : u.reasons.length >= 2
+                            ? "rgba(255, 181, 71, 0.05)"
+                            : "transparent"
+                        }
+                        outline={isTarget ? "2px solid #00D9C0" : undefined}
+                        outlineOffset={isTarget ? "-2px" : undefined}
+                        borderRadius={isTarget ? "8px" : undefined}
+                        transition="background 0.3s, outline 0.3s"
+                        _hover={{ bg: isTarget ? "rgba(0, 217, 192, 0.2)" : "rgba(0, 217, 192, 0.03)" }}
                       >
                         <Td py={3}>
                           <HStack spacing={3}>
