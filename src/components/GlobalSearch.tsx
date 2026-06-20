@@ -11,13 +11,35 @@ import {
   useOutsideClick,
   Spinner,
   Avatar,
+  Tag,
+  TagLabel,
+  TagLeftIcon,
 } from "@chakra-ui/react";
-import { Search, User } from "lucide-react";
+import { Search, AlertTriangle, Zap, TrendingUp, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useFilterStore } from "@/stores/filter";
 import type { SearchUserResult } from "@/types";
 
 const DEBOUNCE_MS = 300;
+
+const ANOMALY_ICONS: Record<string, typeof AlertTriangle> = {
+  freq: Zap,
+  spike: TrendingUp,
+  late: Clock,
+};
+
+const ANOMALY_COLORS: Record<string, string> = {
+  freq: "#FFB547",
+  spike: "#ef4444",
+  late: "#8B5CF6",
+};
+
+const ANOMALY_LABELS: Record<string, string> = {
+  freq: "频次异常",
+  spike: "金额突增",
+  late: "深夜占比高",
+};
 
 export function GlobalSearch({ size = "md" }: { size?: "sm" | "md" }) {
   const [query, setQuery] = useState("");
@@ -27,6 +49,7 @@ export function GlobalSearch({ size = "md" }: { size?: "sm" | "md" }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
   const navigate = useNavigate();
+  const { start, end } = useFilterStore();
 
   useOutsideClick({
     ref: wrapperRef,
@@ -41,14 +64,14 @@ export function GlobalSearch({ size = "md" }: { size?: "sm" | "md" }) {
     }
     try {
       setLoading(true);
-      const res = await api.searchUsers(q);
+      const res = await api.searchMonitorUsers(q, start, end);
       setResults(res.items || []);
     } catch {
       setResults([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [start, end]);
 
   useEffect(() => {
     if (timerRef.current) {
@@ -82,7 +105,7 @@ export function GlobalSearch({ size = "md" }: { size?: "sm" | "md" }) {
           <Search size={16} color="#64748b" />
         </InputLeftElement>
         <Input
-          placeholder="搜索用户ID或昵称…"
+          placeholder="搜索异常用户ID或昵称…"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -123,11 +146,12 @@ export function GlobalSearch({ size = "md" }: { size?: "sm" | "md" }) {
             </HStack>
           ) : results.length === 0 ? (
             <VStack py={5} spacing={1}>
-              <User size={18} color="#475569" />
-              <Text fontSize="xs" color="#64748b">未找到匹配用户</Text>
+              <AlertTriangle size={18} color="#475569" />
+              <Text fontSize="xs" color="#64748b">未找到匹配的异常用户</Text>
+              <Text fontSize="10px" color="#475569">仅显示当前时间范围内的异常用户</Text>
             </VStack>
           ) : (
-            <VStack align="stretch" spacing={0} maxH="340px" overflowY="auto">
+            <VStack align="stretch" spacing={0} maxH="360px" overflowY="auto">
               {results.map((u) => (
                 <HStack
                   key={u.userId}
@@ -145,7 +169,7 @@ export function GlobalSearch({ size = "md" }: { size?: "sm" | "md" }) {
                   _last={{ borderBottom: "none" }}
                 >
                   <Avatar size="xs" name={u.nickname} bg="#00D9C0" color="#070a13" fontSize="11px" fontWeight={700} />
-                  <VStack align="stretch" spacing={0} flex={1}>
+                  <VStack align="stretch" spacing={1} flex={1}>
                     <HStack justify="space-between">
                       <Text fontSize="sm" color="#e2e8f0" fontWeight={600}>
                         {u.nickname}
@@ -162,11 +186,33 @@ export function GlobalSearch({ size = "md" }: { size?: "sm" | "md" }) {
                         {u.userId}
                       </Badge>
                     </HStack>
-                    <HStack spacing={2} mt={0.5}>
+                    <HStack spacing={2} mt={0.5} flexWrap="wrap">
                       <Text fontSize="10px" color="#64748b">{u.tierName}</Text>
                       <Text fontSize="10px" color="#475569">·</Text>
                       <Text fontSize="10px" color="#64748b">{u.channel}</Text>
                     </HStack>
+                    {u.reasons && u.reasons.length > 0 && (
+                      <HStack spacing={1} mt={1} flexWrap="wrap">
+                        {u.reasons.slice(0, 3).map((r) => {
+                          const Icon = ANOMALY_ICONS[r] || AlertTriangle;
+                          const color = ANOMALY_COLORS[r] || "#64748b";
+                          const label = ANOMALY_LABELS[r] || r;
+                          return (
+                            <Tag
+                              key={r}
+                              size="sm"
+                              bg={color + "15"}
+                              color={color}
+                              borderRadius="4px"
+                              py={0}
+                            >
+                              <TagLeftIcon as={Icon} size={10} />
+                              <TagLabel fontSize="9px">{label}</TagLabel>
+                            </Tag>
+                          );
+                        })}
+                      </HStack>
+                    )}
                   </VStack>
                 </HStack>
               ))}

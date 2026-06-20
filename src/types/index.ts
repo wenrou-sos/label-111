@@ -239,6 +239,8 @@ export interface SearchUserResult {
   tier: string;
   tierName: string;
   channel: string;
+  reasons?: string[];
+  reasonLabels?: string[];
 }
 
 export interface SearchUserResponse {

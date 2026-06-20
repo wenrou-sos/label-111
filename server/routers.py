@@ -68,6 +68,31 @@ def monitor(start: str = "", end: str = ""):
     return services.compute_monitor(start, end)
 
 
+@router.get("/monitor/search")
+def monitor_search(q: str = Query("", alias="q"), start: str = "", end: str = "", limit: int = 10):
+    keyword = (q or "").strip().lower()
+    if not keyword:
+        return {"items": []}
+    data = services.compute_monitor(start, end)
+    matched = []
+    for u in data["users"]:
+        uid = str(u.get("userId", "")).lower()
+        nick = str(u.get("nickname", "")).lower()
+        if keyword in uid or keyword in nick:
+            matched.append({
+                "userId": u["userId"],
+                "nickname": u["nickname"],
+                "tier": u["tier"],
+                "tierName": u["tierName"],
+                "channel": u["channel"],
+                "reasons": u["reasons"],
+                "reasonLabels": u["reasonLabels"],
+            })
+            if len(matched) >= limit:
+                break
+    return {"items": matched}
+
+
 @router.post("/monitor/intervene")
 def intervene(body: dict):
     user_id = body.get("user_id", "")

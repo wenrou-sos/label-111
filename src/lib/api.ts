@@ -111,6 +111,11 @@ export const api = {
     return res.data;
   },
 
+  async searchMonitorUsers(q: string, start?: string, end?: string, limit = 10): Promise<SearchUserResponse> {
+    const res = await http.get("/monitor/search", { params: buildParams({ q, start, end, limit }) });
+    return res.data;
+  },
+
   getExportUrl(module: string, format = "csv"): string {
     return `/api/export?module=${encodeURIComponent(module)}&format=${format}`;
   },
