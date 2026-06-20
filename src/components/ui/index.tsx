@@ -15,6 +15,7 @@ import {
   MenuItem,
   IconButton,
   Badge,
+  SimpleGrid,
 } from "@chakra-ui/react";
 import { Download, ChevronDown, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
@@ -325,5 +326,152 @@ export function AlertCard({
         )}
       </VStack>
     </HStack>
+  );
+}
+
+function formatCompareValue(v: number, unit: string) {
+  if (unit === "%") return v.toFixed(2) + unit;
+  if (v >= 100000000) return (v / 100000000).toFixed(2) + "亿";
+  if (v >= 10000) return (v / 10000).toFixed(2) + "万";
+  return v.toLocaleString("zh-CN");
+}
+
+function computeDeltaPct(current: number, prev: number): number {
+  if (prev === 0) return 0;
+  return ((current - prev) / Math.abs(prev)) * 100;
+}
+
+export function CompareStatCard({
+  label,
+  currentValue,
+  prevValue,
+  unit,
+  accent,
+}: {
+  label: string;
+  currentValue: number;
+  prevValue: number;
+  unit: string;
+  accent: string;
+}) {
+  const delta = computeDeltaPct(currentValue, prevValue);
+  const isPositive = delta >= 0;
+  const isZero = prevValue === 0 && currentValue === 0;
+
+  return (
+    <Card
+      bg="rgba(15, 20, 34, 0.7)"
+      border="1px solid rgba(30, 38, 64, 0.8)"
+      borderRadius="16px"
+      backdropFilter="blur(12px)"
+      boxShadow="0 4px 20px rgba(0, 0, 0, 0.2)"
+      p={0}
+      position="relative"
+      overflow="hidden"
+    >
+      <Box
+        position="absolute"
+        top={0}
+        left={0}
+        w="3px"
+        h="100%"
+        bg={accent}
+        opacity={0.8}
+      />
+      <VStack align="stretch" spacing={0} w="100%" h="100%">
+        <Box px={5} pt={4} pb={2}>
+          <Text fontSize="sm" color="#64748b" fontWeight={500}>
+            {label}
+          </Text>
+        </Box>
+
+        <SimpleGrid columns={2} spacing={0} w="100%" flex={1}>
+          <Box
+            p={4}
+            borderTop="1px solid rgba(0, 217, 192, 0.15)"
+            bg="rgba(0, 217, 192, 0.03)"
+            position="relative"
+          >
+            <HStack justify="space-between" mb={2}>
+              <Badge
+                fontSize="9px"
+                bg="rgba(0, 217, 192, 0.15)"
+                color="#00D9C0"
+                px={1.5}
+                py={0.5}
+                borderRadius="4px"
+              >
+                A 当前
+              </Badge>
+            </HStack>
+            <HStack align="baseline" spacing={1}>
+              <Text
+                fontSize="2xl"
+                fontWeight={800}
+                color="#e2e8f0"
+                fontFamily='"JetBrains Mono", monospace'
+              >
+                {formatCompareValue(currentValue, unit)}
+              </Text>
+              <Text fontSize="xs" color="#64748b">
+                {unit === "%" ? "" : unit}
+              </Text>
+            </HStack>
+          </Box>
+
+          <Box
+            p={4}
+            borderTop="1px solid rgba(245, 158, 11, 0.15)"
+            borderLeft="1px solid rgba(30, 38, 64, 0.6)"
+            bg="rgba(245, 158, 11, 0.03)"
+            position="relative"
+          >
+            <HStack justify="space-between" mb={2}>
+              <Badge
+                fontSize="9px"
+                bg="rgba(245, 158, 11, 0.15)"
+                color="#F59E0B"
+                px={1.5}
+                py={0.5}
+                borderRadius="4px"
+              >
+                B 对比
+              </Badge>
+              {!isZero && (
+                <HStack spacing={0.5}>
+                  {isPositive ? (
+                    <TrendingUp size={11} color="#22c55e" />
+                  ) : (
+                    <TrendingDown size={11} color="#ef4444" />
+                  )}
+                  <Text
+                    fontSize="10px"
+                    fontWeight={700}
+                    color={isPositive ? "#22c55e" : "#ef4444"}
+                    fontFamily='"JetBrains Mono", monospace'
+                  >
+                    {isPositive ? "+" : ""}
+                    {delta.toFixed(1)}%
+                  </Text>
+                </HStack>
+              )}
+            </HStack>
+            <HStack align="baseline" spacing={1}>
+              <Text
+                fontSize="2xl"
+                fontWeight={800}
+                color="#94a3b8"
+                fontFamily='"JetBrains Mono", monospace'
+              >
+                {formatCompareValue(prevValue, unit)}
+              </Text>
+              <Text fontSize="xs" color="#475569">
+                {unit === "%" ? "" : unit}
+              </Text>
+            </HStack>
+          </Box>
+        </SimpleGrid>
+      </VStack>
+    </Card>
   );
 }

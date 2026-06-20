@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   VStack,
   SimpleGrid,
@@ -32,7 +32,15 @@ import {
 import { api } from "@/lib/api";
 import { useFilterStore } from "@/stores/filter";
 import { FilterBar } from "@/components/FilterBar";
-import { SectionHeader, ChartCard, ExportButton, LoadingState, StatusBadge, AlertCard } from "@/components/ui";
+import {
+  SectionHeader,
+  ChartCard,
+  ExportButton,
+  LoadingState,
+  StatusBadge,
+  AlertCard,
+  CompareStatCard,
+} from "@/components/ui";
 import { formatCurrency, formatNumber, formatCompact, formatPercent } from "@/lib/format";
 import type { PnlResponse, MetaResponse } from "@/types";
 
@@ -53,27 +61,55 @@ const BET_TYPE_COLORS: Record<string, string> = {
   波胆: "#FFB547",
 };
 
+const CURRENT_COLOR = "#00D9C0";
+const COMPARE_COLOR = "#F59E0B";
+
+function mergeTrend(a: PnlResponse["trend"], b: PnlResponse["trend"]) {
+  const map = new Map<string, Record<string, string | number>>();
+  a.forEach((d) => {
+    map.set(d.month, {
+      month: d.month,
+      bet_A: d.bet,
+      payout_A: d.payout,
+      ratio_A: d.ratio,
+    });
+  });
+  b.forEach((d) => {
+    const ex = map.get(d.month) || { month: d.month };
+    ex.bet_B = d.bet;
+    ex.payout_B = d.payout;
+    ex.ratio_B = d.ratio;
+    map.set(d.month, ex);
+  });
+  return Array.from(map.values()).sort((a, b) => String(a.month).localeCompare(String(b.month)));
+}
+
 export default function Profit() {
-  const { start, end, league } = useFilterStore();
+  const { start, end, compareMode, compareStart, compareEnd, league } = useFilterStore();
   const [data, setData] = useState<PnlResponse | null>(null);
+  const [cmpData, setCmpData] = useState<PnlResponse | null>(null);
   const [meta, setMeta] = useState<MetaResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, m] = await Promise.all([
-        api.pnl(start, end, league),
-        api.meta(),
-      ]);
+      const [p, m] = await Promise.all([api.pnl(start, end, league), api.meta()]);
       setData(p);
       setMeta(m);
+
+      if (compareMode) {
+        const [cp] = await Promise.all([api.pnl(compareStart, compareEnd, league)]);
+        setCmpData(cp);
+      } else {
+        setCmpData(null);
+      }
     } catch {
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [start, end, league]);
+  }, [start, end, league, compareMode, compareStart, compareEnd]);
 
   useEffect(() => {
     fetchData();
@@ -87,6 +123,13 @@ export default function Profit() {
     return "#22c55e";
   };
 
+  const mergedTrend = useMemo(
+    () => (cmpData ? mergeTrend(data?.trend || [], cmpData?.trend || []) : data?.trend || []),
+    [data, cmpData]
+  );
+
+  const showCompare = compareMode && data && cmpData;
+
   return (
     <VStack spacing={6} align="stretch">
       <SectionHeader
@@ -95,7 +138,7 @@ export default function Profit() {
         rightAction={<ExportButton module="pnl" />}
       />
 
-      <FilterBar showLeague />
+      <FilterBar showLeague showCompare />
 
       {loading && !data ? (
         <VStack spacing={5} align="stretch">
@@ -116,111 +159,141 @@ export default function Profit() {
         <LoadingState text="暂无数据" />
       ) : (
         <>
-          <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
-            <Box
-              bg="rgba(15, 20, 34, 0.7)"
-              border="1px solid rgba(30, 38, 64, 0.8)"
-              borderRadius="16px"
-              p={5}
-              position="relative"
-              overflow="hidden"
-            >
-              <Box position="absolute" top={0} left={0} w="100%" h="3px" bg="#00D9C0" />
-              <VStack align="stretch" spacing={2}>
-                <Text fontSize="xs" color="#64748b">总投注额</Text>
-                <HStack align="baseline" spacing={1}>
-                  <Text
-                    fontSize="2xl"
-                    fontWeight={800}
-                    color="#e2e8f0"
-                    fontFamily='"JetBrains Mono", monospace'
-                  >
-                    {formatCurrency(data.summary.totalBet)}
-                  </Text>
-                  <Text fontSize="xs" color="#64748b">元</Text>
-                </HStack>
-              </VStack>
-            </Box>
-
-            <Box
-              bg="rgba(15, 20, 34, 0.7)"
-              border="1px solid rgba(30, 38, 64, 0.8)"
-              borderRadius="16px"
-              p={5}
-              position="relative"
-              overflow="hidden"
-            >
-              <Box position="absolute" top={0} left={0} w="100%" h="3px" bg="#8B5CF6" />
-              <VStack align="stretch" spacing={2}>
-                <Text fontSize="xs" color="#64748b">总派彩</Text>
-                <HStack align="baseline" spacing={1}>
-                  <Text
-                    fontSize="2xl"
-                    fontWeight={800}
-                    color="#e2e8f0"
-                    fontFamily='"JetBrains Mono", monospace'
-                  >
-                    {formatCurrency(data.summary.totalPayout)}
-                  </Text>
-                  <Text fontSize="xs" color="#64748b">元</Text>
-                </HStack>
-              </VStack>
-            </Box>
-
-            <Box
-              bg="rgba(15, 20, 34, 0.7)"
-              border="1px solid rgba(30, 38, 64, 0.8)"
-              borderRadius="16px"
-              p={5}
-              position="relative"
-              overflow="hidden"
-            >
-              <Box position="absolute" top={0} left={0} w="100%" h="3px" bg={STATUS_COLORS[data.summary.status]} />
-              <VStack align="stretch" spacing={2}>
-                <HStack justify="space-between" align="center">
-                  <Text fontSize="xs" color="#64748b">赔付率</Text>
-                  <StatusBadge status={data.summary.status} />
-                </HStack>
-                <HStack align="baseline" spacing={1}>
-                  <Text
-                    fontSize="2xl"
-                    fontWeight={800}
-                    color={STATUS_COLORS[data.summary.status]}
-                    fontFamily='"JetBrains Mono", monospace'
-                  >
-                    {(data.summary.payoutRatio * 100).toFixed(2)}
-                  </Text>
-                  <Text fontSize="xs" color="#64748b">%</Text>
-                </HStack>
-              </VStack>
-            </Box>
-
-            <Box
-              bg="rgba(15, 20, 34, 0.7)"
-              border="1px solid rgba(30, 38, 64, 0.8)"
-              borderRadius="16px"
-              p={5}
-              position="relative"
-              overflow="hidden"
-            >
-              <Box position="absolute" top={0} left={0} w="100%" h="3px" bg="#22c55e" />
-              <VStack align="stretch" spacing={2}>
-                <Text fontSize="xs" color="#64748b">平台盈利</Text>
-                <HStack align="baseline" spacing={1}>
-                  <Text
-                    fontSize="2xl"
-                    fontWeight={800}
-                    color={data.summary.netResult >= 0 ? "#22c55e" : "#ef4444"}
-                    fontFamily='"JetBrains Mono", monospace'
-                  >
-                    {data.summary.netResult >= 0 ? "+" : ""}
-                    {formatCurrency(Math.abs(data.summary.netResult))}
-                  </Text>
-                  <Text fontSize="xs" color="#64748b">元</Text>
-                </HStack>
-              </VStack>
-            </Box>
-          </SimpleGrid>
+          {showCompare ? (
+            <SimpleGrid columns={{ base: 1, md: 2, xl: 4 }} spacing={4}>
+              <CompareStatCard
+                label="总投注额"
+                currentValue={data.summary.totalBet}
+                prevValue={cmpData.summary.totalBet}
+                unit="元"
+                accent={CURRENT_COLOR}
+              />
+              <CompareStatCard
+                label="总派彩"
+                currentValue={data.summary.totalPayout}
+                prevValue={cmpData.summary.totalPayout}
+                unit="元"
+                accent="#8B5CF6"
+              />
+              <CompareStatCard
+                label="赔付率"
+                currentValue={+(data.summary.payoutRatio * 100).toFixed(2)}
+                prevValue={+(cmpData.summary.payoutRatio * 100).toFixed(2)}
+                unit="%"
+                accent={STATUS_COLORS[data.summary.status]}
+              />
+              <CompareStatCard
+                label="平台盈利"
+                currentValue={Math.abs(data.summary.netResult)}
+                prevValue={Math.abs(cmpData.summary.netResult)}
+                unit="元"
+                accent={data.summary.netResult >= 0 ? "#22c55e" : "#ef4444"}
+              />
+            </SimpleGrid>
+          ) : (
+            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
+              <Box
+                bg="rgba(15, 20, 34, 0.7)"
+                border="1px solid rgba(30, 38, 64, 0.8)"
+                borderRadius="16px"
+                p={5}
+                position="relative"
+                overflow="hidden"
+              >
+                <Box position="absolute" top={0} left={0} w="100%" h="3px" bg={CURRENT_COLOR} />
+                <VStack align="stretch" spacing={2}>
+                  <Text fontSize="xs" color="#64748b">总投注额</Text>
+                  <HStack align="baseline" spacing={1}>
+                    <Text
+                      fontSize="2xl"
+                      fontWeight={800}
+                      color="#e2e8f0"
+                      fontFamily='"JetBrains Mono", monospace'
+                    >
+                      {formatCurrency(data.summary.totalBet)}
+                    </Text>
+                    <Text fontSize="xs" color="#64748b">元</Text>
+                  </HStack>
+                </VStack>
+              </Box>
+              <Box
+                bg="rgba(15, 20, 34, 0.7)"
+                border="1px solid rgba(30, 38, 64, 0.8)"
+                borderRadius="16px"
+                p={5}
+                position="relative"
+                overflow="hidden"
+              >
+                <Box position="absolute" top={0} left={0} w="100%" h="3px" bg="#8B5CF6" />
+                <VStack align="stretch" spacing={2}>
+                  <Text fontSize="xs" color="#64748b">总派彩</Text>
+                  <HStack align="baseline" spacing={1}>
+                    <Text
+                      fontSize="2xl"
+                      fontWeight={800}
+                      color="#e2e8f0"
+                      fontFamily='"JetBrains Mono", monospace'
+                    >
+                      {formatCurrency(data.summary.totalPayout)}
+                    </Text>
+                    <Text fontSize="xs" color="#64748b">元</Text>
+                  </HStack>
+                </VStack>
+              </Box>
+              <Box
+                bg="rgba(15, 20, 34, 0.7)"
+                border="1px solid rgba(30, 38, 64, 0.8)"
+                borderRadius="16px"
+                p={5}
+                position="relative"
+                overflow="hidden"
+              >
+                <Box position="absolute" top={0} left={0} w="100%" h="3px" bg={STATUS_COLORS[data.summary.status]} />
+                <VStack align="stretch" spacing={2}>
+                  <HStack justify="space-between" align="center">
+                    <Text fontSize="xs" color="#64748b">赔付率</Text>
+                    <StatusBadge status={data.summary.status} />
+                  </HStack>
+                  <HStack align="baseline" spacing={1}>
+                    <Text
+                      fontSize="2xl"
+                      fontWeight={800}
+                      color={STATUS_COLORS[data.summary.status]}
+                      fontFamily='"JetBrains Mono", monospace'
+                    >
+                      {(data.summary.payoutRatio * 100).toFixed(2)}
+                    </Text>
+                    <Text fontSize="xs" color="#64748b">%</Text>
+                  </HStack>
+                </VStack>
+              </Box>
+              <Box
+                bg="rgba(15, 20, 34, 0.7)"
+                border="1px solid rgba(30, 38, 64, 0.8)"
+                borderRadius="16px"
+                p={5}
+                position="relative"
+                overflow="hidden"
+              >
+                <Box position="absolute" top={0} left={0} w="100%" h="3px" bg="#22c55e" />
+                <VStack align="stretch" spacing={2}>
+                  <Text fontSize="xs" color="#64748b">平台盈利</Text>
+                  <HStack align="baseline" spacing={1}>
+                    <Text
+                      fontSize="2xl"
+                      fontWeight={800}
+                      color={data.summary.netResult >= 0 ? "#22c55e" : "#ef4444"}
+                      fontFamily='"JetBrains Mono", monospace'
+                    >
+                      {data.summary.netResult >= 0 ? "+" : ""}
+                      {formatCurrency(Math.abs(data.summary.netResult))}
+                    </Text>
+                    <Text fontSize="xs" color="#64748b">元</Text>
+                  </HStack>
+                </VStack>
+              </Box>
+            </SimpleGrid>
+          )}
 
           {data.alerts.length > 0 && (
             <VStack spacing={2}>
@@ -234,104 +307,252 @@ export default function Profit() {
             </VStack>
           )}
 
-          <ChartCard title="赔付率趋势" subtitle="月度赔付率与投注额变化" height={360}>
+          <ChartCard
+            title={compareMode ? "赔付率趋势（对比模式）" : "赔付率趋势"}
+            subtitle={compareMode ? "A = 当前时段，B = 对比时段" : "月度赔付率与投注额变化"}
+            height={380}
+            rightAction={
+              compareMode ? (
+                <HStack spacing={2}>
+                  <HStack spacing={1}>
+                    <Box w="10px" h="10px" borderRadius="2px" bg={CURRENT_COLOR} />
+                    <Text fontSize="10px" color="#94a3b8">A</Text>
+                  </HStack>
+                  <HStack spacing={1}>
+                    <Box w="10px" h="10px" borderRadius="2px" bg={COMPARE_COLOR} />
+                    <Text fontSize="10px" color="#94a3b8">B</Text>
+                  </HStack>
+                </HStack>
+              ) : undefined
+            }
+          >
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data.trend} margin={{ top: 8, right: 20, bottom: 0, left: -10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2640" vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fill: "#64748b", fontSize: 10 }}
-                  axisLine={{ stroke: "#1e2640" }}
-                />
-                <YAxis
-                  yAxisId="left"
-                  tick={{ fill: "#64748b", fontSize: 10 }}
-                  tickFormatter={(v) => formatCompact(v)}
-                  axisLine={{ stroke: "#1e2640" }}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tick={{ fill: "#64748b", fontSize: 10 }}
-                  tickFormatter={(v) => (v * 100).toFixed(0) + "%"}
-                  axisLine={{ stroke: "#1e2640" }}
-                  domain={[0.75, 1.05]}
-                />
-                <Tooltip
-                  content={({ active, payload, label }) => {
-                    if (!active || !payload?.length) return null;
-                    const d = payload[0].payload as Record<string, string | number>;
-                    return (
-                      <Box
-                        bg="rgba(15,20,34,0.95)"
-                        border="1px solid rgba(0,217,192,0.25)"
-                        borderRadius="12px"
-                        p={3}
-                        minW="180px"
-                        boxShadow="0 8px 24px rgba(0,0,0,0.4)"
-                      >
-                        <Text fontSize="xs" color="#e2e8f0" fontWeight={700} mb={1.5}>
-                          {label}
-                        </Text>
-                        <VStack spacing={1} align="stretch">
-                          <HStack justify="space-between">
-                            <Text fontSize="xs" color="#94a3b8">投注额</Text>
-                            <Text fontSize="xs" color="#00D9C0" fontWeight={700}>
-                              {formatCurrency(num(d.bet))}
-                            </Text>
-                          </HStack>
-                          <HStack justify="space-between">
-                            <Text fontSize="xs" color="#94a3b8">派彩</Text>
-                            <Text fontSize="xs" color="#8B5CF6" fontWeight={700}>
-                              {formatCurrency(num(d.payout))}
-                            </Text>
-                          </HStack>
-                          <HStack justify="space-between">
-                            <Text fontSize="xs" color="#94a3b8">赔付率</Text>
-                            <Text
-                              fontSize="xs"
-                              color={getStatusColor(num(d.ratio))}
-                              fontWeight={700}
-                            >
-                              {(num(d.ratio) * 100).toFixed(2)}%
-                            </Text>
-                          </HStack>
-                        </VStack>
-                      </Box>
-                    );
-                  }}
-                />
-                <Legend
-                  verticalAlign="bottom"
-                  iconType="circle"
-                  wrapperStyle={{ fontSize: 12, color: "#94a3b8", paddingTop: 8 }}
-                />
-                <Bar
-                  yAxisId="left"
-                  dataKey="bet"
-                  name="投注额"
-                  fill="#00D9C0"
-                  radius={[4, 4, 0, 0]}
-                  opacity={0.8}
-                />
-                <Bar
-                  yAxisId="left"
-                  dataKey="payout"
-                  name="派彩"
-                  fill="#8B5CF6"
-                  radius={[4, 4, 0, 0]}
-                  opacity={0.6}
-                />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="ratio"
-                  name="赔付率"
-                  stroke="#FFB547"
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: "#FFB547", strokeWidth: 0 }}
-                />
-              </ComposedChart>
+              {compareMode ? (
+                <LineChart data={mergedTrend} margin={{ top: 8, right: 20, bottom: 0, left: -10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2640" vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: "#64748b", fontSize: 10 }}
+                    axisLine={{ stroke: "#1e2640" }}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fill: "#64748b", fontSize: 10 }}
+                    tickFormatter={(v) => formatCompact(v)}
+                    axisLine={{ stroke: "#1e2640" }}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fill: "#64748b", fontSize: 10 }}
+                    tickFormatter={(v) => (v * 100).toFixed(0) + "%"}
+                    axisLine={{ stroke: "#1e2640" }}
+                    domain={[0.75, 1.05]}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload as Record<string, string | number>;
+                      return (
+                        <Box
+                          bg="rgba(15,20,34,0.95)"
+                          border="1px solid rgba(0,217,192,0.25)"
+                          borderRadius="12px"
+                          p={3}
+                          minW="220px"
+                          boxShadow="0 8px 24px rgba(0,0,0,0.4)"
+                        >
+                          <Text fontSize="xs" color="#e2e8f0" fontWeight={700} mb={1.5}>
+                            {label}
+                          </Text>
+                          <VStack spacing={1} align="stretch">
+                            {d.bet_A !== undefined && (
+                              <>
+                                <HStack justify="space-between">
+                                  <HStack spacing={1}>
+                                    <Box w="8px" h="8px" borderRadius="2px" bg={CURRENT_COLOR} />
+                                    <Text fontSize="xs" color="#94a3b8">A 投注额</Text>
+                                  </HStack>
+                                  <Text fontSize="xs" color="#e2e8f0" fontWeight={700}>
+                                    {formatCurrency(num(d.bet_A))}
+                                  </Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text fontSize="xs" color="#475569" pl={3}>A 派彩</Text>
+                                  <Text fontSize="xs" color="#8B5CF6" fontWeight={700}>
+                                    {formatCurrency(num(d.payout_A))}
+                                  </Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text fontSize="xs" color="#475569" pl={3}>A 赔付率</Text>
+                                  <Text
+                                    fontSize="xs"
+                                    color={getStatusColor(num(d.ratio_A))}
+                                    fontWeight={700}
+                                  >
+                                    {(num(d.ratio_A) * 100).toFixed(2)}%
+                                  </Text>
+                                </HStack>
+                              </>
+                            )}
+                            {d.bet_B !== undefined && (
+                              <>
+                                <Box h="1px" w="100%" bg="rgba(30, 38, 64, 0.6)" my={1} />
+                                <HStack justify="space-between">
+                                  <HStack spacing={1}>
+                                    <Box w="8px" h="8px" borderRadius="2px" bg={COMPARE_COLOR} />
+                                    <Text fontSize="xs" color="#94a3b8">B 投注额</Text>
+                                  </HStack>
+                                  <Text fontSize="xs" color="#94a3b8" fontWeight={700}>
+                                    {formatCurrency(num(d.bet_B))}
+                                  </Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text fontSize="xs" color="#475569" pl={3}>B 派彩</Text>
+                                  <Text fontSize="xs" color="#8B5CF6" fontWeight={700}>
+                                    {formatCurrency(num(d.payout_B))}
+                                  </Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text fontSize="xs" color="#475569" pl={3}>B 赔付率</Text>
+                                  <Text
+                                    fontSize="xs"
+                                    color={getStatusColor(num(d.ratio_B))}
+                                    fontWeight={700}
+                                  >
+                                    {(num(d.ratio_B) * 100).toFixed(2)}%
+                                  </Text>
+                                </HStack>
+                              </>
+                            )}
+                          </VStack>
+                        </Box>
+                      );
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: 11, color: "#94a3b8", paddingTop: 8 }}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="ratio_A"
+                    name="A 赔付率"
+                    stroke={CURRENT_COLOR}
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: CURRENT_COLOR, strokeWidth: 0 }}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="ratio_B"
+                    name="B 赔付率"
+                    stroke={COMPARE_COLOR}
+                    strokeWidth={2.5}
+                    strokeDasharray="5 4"
+                    dot={{ r: 4, fill: COMPARE_COLOR, strokeWidth: 0 }}
+                  />
+                </LineChart>
+              ) : (
+                <ComposedChart data={data.trend} margin={{ top: 8, right: 20, bottom: 0, left: -10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2640" vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: "#64748b", fontSize: 10 }}
+                    axisLine={{ stroke: "#1e2640" }}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fill: "#64748b", fontSize: 10 }}
+                    tickFormatter={(v) => formatCompact(v)}
+                    axisLine={{ stroke: "#1e2640" }}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fill: "#64748b", fontSize: 10 }}
+                    tickFormatter={(v) => (v * 100).toFixed(0) + "%"}
+                    axisLine={{ stroke: "#1e2640" }}
+                    domain={[0.75, 1.05]}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload as Record<string, string | number>;
+                      return (
+                        <Box
+                          bg="rgba(15,20,34,0.95)"
+                          border="1px solid rgba(0,217,192,0.25)"
+                          borderRadius="12px"
+                          p={3}
+                          minW="180px"
+                          boxShadow="0 8px 24px rgba(0,0,0,0.4)"
+                        >
+                          <Text fontSize="xs" color="#e2e8f0" fontWeight={700} mb={1.5}>
+                            {label}
+                          </Text>
+                          <VStack spacing={1} align="stretch">
+                            <HStack justify="space-between">
+                              <Text fontSize="xs" color="#94a3b8">投注额</Text>
+                              <Text fontSize="xs" color={CURRENT_COLOR} fontWeight={700}>
+                                {formatCurrency(num(d.bet))}
+                              </Text>
+                            </HStack>
+                            <HStack justify="space-between">
+                              <Text fontSize="xs" color="#94a3b8">派彩</Text>
+                              <Text fontSize="xs" color="#8B5CF6" fontWeight={700}>
+                                {formatCurrency(num(d.payout))}
+                              </Text>
+                            </HStack>
+                            <HStack justify="space-between">
+                              <Text fontSize="xs" color="#94a3b8">赔付率</Text>
+                              <Text
+                                fontSize="xs"
+                                color={getStatusColor(num(d.ratio))}
+                                fontWeight={700}
+                              >
+                                {(num(d.ratio) * 100).toFixed(2)}%
+                              </Text>
+                            </HStack>
+                          </VStack>
+                        </Box>
+                      );
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: 12, color: "#94a3b8", paddingTop: 8 }}
+                  />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="bet"
+                    name="投注额"
+                    fill={CURRENT_COLOR}
+                    radius={[4, 4, 0, 0]}
+                    opacity={0.8}
+                  />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="payout"
+                    name="派彩"
+                    fill="#8B5CF6"
+                    radius={[4, 4, 0, 0]}
+                    opacity={0.6}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="ratio"
+                    name="赔付率"
+                    stroke="#FFB547"
+                    strokeWidth={2}
+                    dot={{ r: 4, fill: "#FFB547", strokeWidth: 0 }}
+                  />
+                </ComposedChart>
+              )}
             </ResponsiveContainer>
           </ChartCard>
 
@@ -377,7 +598,7 @@ export default function Profit() {
                           <VStack spacing={1} align="stretch">
                             <HStack justify="space-between">
                               <Text fontSize="xs" color="#94a3b8">投注额</Text>
-                              <Text fontSize="xs" color="#00D9C0" fontWeight={700}>
+                              <Text fontSize="xs" color={CURRENT_COLOR} fontWeight={700}>
                                 {formatCurrency(num(d.bet))}
                               </Text>
                             </HStack>
@@ -406,7 +627,7 @@ export default function Profit() {
                     {data.byLeague.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
-                        fill={getStatusColor(entry.ratio) === "#22c55e" ? "#00D9C0" : getStatusColor(entry.ratio)}
+                        fill={getStatusColor(entry.ratio) === "#22c55e" ? CURRENT_COLOR : getStatusColor(entry.ratio)}
                         fillOpacity={0.8}
                       />
                     ))}
@@ -449,7 +670,7 @@ export default function Profit() {
                           <VStack spacing={1} align="stretch">
                             <HStack justify="space-between">
                               <Text fontSize="xs" color="#94a3b8">投注额</Text>
-                              <Text fontSize="xs" color="#00D9C0" fontWeight={700}>
+                              <Text fontSize="xs" color={CURRENT_COLOR} fontWeight={700}>
                                 {formatCurrency(num(d.bet))}
                               </Text>
                             </HStack>
@@ -476,7 +697,7 @@ export default function Profit() {
                   />
                   <Bar dataKey="bet" radius={[4, 4, 0, 0]} barSize={40}>
                     {data.byType.map((entry) => (
-                      <Cell key={entry.type} fill={BET_TYPE_COLORS[entry.type] || "#00D9C0"} />
+                      <Cell key={entry.type} fill={BET_TYPE_COLORS[entry.type] || CURRENT_COLOR} />
                     ))}
                   </Bar>
                 </BarChart>

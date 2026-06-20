@@ -1,5 +1,22 @@
-import { HStack, Select, VStack, Text, Button, Box, useBreakpointValue, Drawer, DrawerBody, DrawerHeader, DrawerOverlay, DrawerContent, DrawerCloseButton, useDisclosure } from "@chakra-ui/react";
-import { Filter, RefreshCw, Calendar, Users, Trophy, UsersRound } from "lucide-react";
+import {
+  HStack,
+  Select,
+  VStack,
+  Text,
+  Button,
+  Box,
+  useBreakpointValue,
+  Drawer,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  useDisclosure,
+  Switch,
+  Badge,
+} from "@chakra-ui/react";
+import { Filter, RefreshCw, Calendar, Users, Trophy, UsersRound, GitCompare, Clock } from "lucide-react";
 import { useFilterStore } from "@/stores/filter";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -16,12 +33,32 @@ export function FilterBar({
   showTier = false,
   showLeague = false,
   showChannel = false,
+  showCompare = false,
 }: {
   showTier?: boolean;
   showLeague?: boolean;
   showChannel?: boolean;
+  showCompare?: boolean;
 }) {
-  const { start, end, tier, league, channel, setStart, setEnd, setTier, setLeague, setChannel, setRange, reset } = useFilterStore();
+  const {
+    start,
+    end,
+    tier,
+    league,
+    channel,
+    compareMode,
+    compareStart,
+    compareEnd,
+    setStart,
+    setEnd,
+    setTier,
+    setLeague,
+    setChannel,
+    setRange,
+    reset,
+    setCompareMode,
+    setCompareRange,
+  } = useFilterStore();
   const [meta, setMeta] = useState<MetaResponse | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const isMobile = useBreakpointValue({ base: true, md: false });
@@ -30,38 +67,134 @@ export function FilterBar({
     api.meta().then(setMeta).catch(() => {});
   }, []);
 
-  const FilterContent = () => (
-    <VStack align="stretch" spacing={4}>
-      <Box>
-        <Text fontSize="xs" color="#64748b" mb={2} fontWeight={600}>
-          时间范围
-        </Text>
-        <HStack spacing={2} wrap="wrap">
-          {RANGE_OPTIONS.map((opt) => (
-            <Button
-              key={opt.key}
-              size="sm"
-              variant="ghost"
-              onClick={() => setRange(opt.key)}
-              fontSize="xs"
-              color="#94a3b8"
-              _hover={{ bg: "rgba(0, 217, 192, 0.1)", color: "#00D9C0" }}
+  const TimeRangeSection = ({
+    title,
+    badge,
+    badgeColor,
+    startDate,
+    endDate,
+    onRange,
+    accent,
+  }: {
+    title: string;
+    badge?: string;
+    badgeColor?: string;
+    startDate: string;
+    endDate: string;
+    onRange: (range: string) => void;
+    accent?: string;
+  }) => (
+    <Box
+      p={3}
+      borderRadius="10px"
+      bg="rgba(0, 217, 192, 0.02)"
+      border="1px solid rgba(30, 38, 64, 0.6)"
+      _hover={{ borderColor: "rgba(0, 217, 192, 0.2)" }}
+      transition="border 0.2s"
+    >
+      <HStack justify="space-between" mb={2}>
+        <HStack spacing={2}>
+          <Text fontSize="xs" color="#94a3b8" fontWeight={600}>
+            {title}
+          </Text>
+          {badge && (
+            <Badge
+              fontSize="9px"
+              bg={accent + "22"}
+              color={accent}
+              borderRadius="4px"
+              px={1.5}
+              py={0.5}
             >
-              {opt.label}
-            </Button>
-          ))}
+              {badge}
+            </Badge>
+          )}
         </HStack>
-        <HStack spacing={2} mt={2}>
-          <Calendar size={14} color="#64748b" />
-          <Text fontSize="xs" color="#64748b">
-            {start} ~ {end}
+        {badgeColor && (
+          <Text fontSize="10px" color={badgeColor} fontFamily='"JetBrains Mono", monospace'>
+            {startDate} ~ {endDate}
+          </Text>
+        )}
+      </HStack>
+      <HStack spacing={1.5} wrap="wrap">
+        {RANGE_OPTIONS.map((opt) => (
+          <Button
+            key={opt.key}
+            size="xs"
+            variant="ghost"
+            onClick={() => onRange(opt.key)}
+            fontSize="10px"
+            color="#64748b"
+            height="26px"
+            px={2.5}
+            _hover={{ bg: "rgba(0, 217, 192, 0.08)", color: "#00D9C0" }}
+            _active={{ bg: "rgba(0, 217, 192, 0.15)" }}
+          >
+            {opt.label}
+          </Button>
+        ))}
+      </HStack>
+      {!badgeColor && (
+        <HStack spacing={1} mt={1.5}>
+          <Calendar size={11} color="#475569" />
+          <Text fontSize="10px" color="#475569" fontFamily='"JetBrains Mono", monospace'>
+            {startDate} ~ {endDate}
           </Text>
         </HStack>
-      </Box>
+      )}
+    </Box>
+  );
+
+  const FilterContent = () => (
+    <VStack align="stretch" spacing={3}>
+      <TimeRangeSection
+        title="当前时段"
+        accent="#00D9C0"
+        badge="A"
+        badgeColor="#00D9C0"
+        startDate={start}
+        endDate={end}
+        onRange={setRange}
+      />
+
+      {showCompare && (
+        <VStack align="stretch" spacing={2}>
+          <HStack justify="space-between" px={0.5}>
+            <HStack spacing={2}>
+              <GitCompare size={14} color={compareMode ? "#F59E0B" : "#475569"} />
+              <Text fontSize="xs" color="#94a3b8" fontWeight={600}>
+                对比模式
+              </Text>
+            </HStack>
+            <Switch
+              size="sm"
+              isChecked={compareMode}
+              onChange={(e) => setCompareMode(e.target.checked)}
+              colorScheme="orange"
+              sx={{
+                ".chakra-switch__track": {
+                  bg: "rgba(30, 38, 64, 0.8)",
+                },
+              }}
+            />
+          </HStack>
+          {compareMode && (
+            <TimeRangeSection
+              title="对比时段"
+              accent="#F59E0B"
+              badge="B"
+              badgeColor="#F59E0B"
+              startDate={compareStart}
+              endDate={compareEnd}
+              onRange={setCompareRange}
+            />
+          )}
+        </VStack>
+      )}
 
       {showTier && (
         <Box>
-          <Text fontSize="xs" color="#64748b" mb={2} fontWeight={600}>
+          <Text fontSize="xs" color="#64748b" mb={1.5} fontWeight={600}>
             用户层级
           </Text>
           <Select
@@ -72,7 +205,8 @@ export function FilterBar({
             borderColor="rgba(30, 38, 64, 0.8)"
             color="#e2e8f0"
             fontSize="xs"
-            icon={<UsersRound size={14} color="#64748b" />}
+            height="30px"
+            icon={<UsersRound size={13} color="#64748b" />}
           >
             <option value="all">全部层级</option>
             {meta?.tiers?.map((t) => (
@@ -86,7 +220,7 @@ export function FilterBar({
 
       {showLeague && (
         <Box>
-          <Text fontSize="xs" color="#64748b" mb={2} fontWeight={600}>
+          <Text fontSize="xs" color="#64748b" mb={1.5} fontWeight={600}>
             联赛筛选
           </Text>
           <Select
@@ -97,7 +231,8 @@ export function FilterBar({
             borderColor="rgba(30, 38, 64, 0.8)"
             color="#e2e8f0"
             fontSize="xs"
-            icon={<Trophy size={14} color="#64748b" />}
+            height="30px"
+            icon={<Trophy size={13} color="#64748b" />}
           >
             <option value="all">全部联赛</option>
             {meta?.leagues?.map((l) => (
@@ -111,7 +246,7 @@ export function FilterBar({
 
       {showChannel && (
         <Box>
-          <Text fontSize="xs" color="#64748b" mb={2} fontWeight={600}>
+          <Text fontSize="xs" color="#64748b" mb={1.5} fontWeight={600}>
             获客渠道
           </Text>
           <Select
@@ -122,7 +257,8 @@ export function FilterBar({
             borderColor="rgba(30, 38, 64, 0.8)"
             color="#e2e8f0"
             fontSize="xs"
-            icon={<Users size={14} color="#64748b" />}
+            height="30px"
+            icon={<Users size={13} color="#64748b" />}
           >
             <option value="all">全部渠道</option>
             {meta?.channels?.map((c) => (
@@ -138,8 +274,10 @@ export function FilterBar({
         size="sm"
         variant="ghost"
         onClick={reset}
-        leftIcon={<RefreshCw size={14} />}
+        leftIcon={<RefreshCw size={13} />}
         color="#64748b"
+        height="30px"
+        fontSize="xs"
         _hover={{ bg: "rgba(100, 116, 139, 0.1)", color: "#94a3b8" }}
       >
         重置筛选
@@ -153,7 +291,7 @@ export function FilterBar({
         <Button
           size="sm"
           variant="outline"
-          leftIcon={<Filter size={16} />}
+          leftIcon={<Filter size={14} />}
           onClick={onOpen}
           borderColor="rgba(30, 38, 64, 0.8)"
           color="#94a3b8"
@@ -184,7 +322,7 @@ export function FilterBar({
       p={4}
       backdropFilter="blur(8px)"
     >
-      <HStack spacing={6} align="flex-start" wrap="wrap">
+      <HStack spacing={5} align="flex-start" wrap="wrap">
         <FilterContent />
       </HStack>
     </Box>
