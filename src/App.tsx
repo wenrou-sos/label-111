@@ -12,12 +12,16 @@ import Users from "@/pages/Users";
 import { AppLayout } from "@/components/AppLayout";
 import { useAuthStore } from "@/stores/auth";
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
+function ProtectedRoute({ children, requirePerm }: { children: React.ReactNode; requirePerm?: string }) {
+  const { user, hasPerm } = useAuthStore();
   const location = useLocation();
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (requirePerm && !hasPerm(requirePerm)) {
+    return <Navigate to="/" replace />;
   }
 
   return <AppLayout>{children}</AppLayout>;
@@ -96,7 +100,7 @@ export default function App() {
         <Route
           path="/users"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requirePerm="manage">
               <Users />
             </ProtectedRoute>
           }

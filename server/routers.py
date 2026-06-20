@@ -2,6 +2,7 @@
 import csv
 import io
 from datetime import datetime
+from urllib.parse import quote
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 
@@ -177,5 +178,5 @@ def export(module: str = "tier", format: str = "csv"):
     return StreamingResponse(
         io.BytesIO(content),
         media_type=media,
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fname}.csv"},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}.csv"},
     )

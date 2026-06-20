@@ -17,6 +17,7 @@ import { api } from "@/lib/api";
 import { useFilterStore } from "@/stores/filter";
 import { formatCurrency, formatNumber, formatCompact } from "@/lib/format";
 import { ChartCard, SectionHeader, ExportButton, LoadingState } from "@/components/ui";
+import { FilterBar } from "@/components/FilterBar";
 import type { PreferenceResponse, MetaResponse } from "@/types";
 
 const BET_TYPE_COLORS: Record<string, string> = {
@@ -133,6 +134,8 @@ export default function Preference() {
         subtitle="联赛与玩法的投注金额及频次分布"
         rightAction={<ExportButton module="preference" />}
       />
+
+      <FilterBar showLeague />
 
       {loading && !data ? (
         <VStack spacing={6} align="stretch">

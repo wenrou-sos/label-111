@@ -42,12 +42,16 @@ const NAV_ITEMS = [
   { path: "/retention", icon: UserCheck, label: "用户留存", desc: "留存率与渠道" },
   { path: "/monitor", icon: AlertTriangle, label: "问题监控", desc: "异常行为识别" },
   { path: "/logs", icon: FileText, label: "操作日志", desc: "系统操作记录" },
-  { path: "/users", icon: Shield, label: "权限管理", desc: "用户与角色管理" },
-];
+  { path: "/users", icon: Shield, label: "权限管理", desc: "用户与角色管理", requirePerm: "manage" },
+] as const;
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { user, logout } = useAuthStore();
+  const { user, logout, hasPerm } = useAuthStore();
   const navigate = useNavigate();
+
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !("requirePerm" in item) || hasPerm(item.requirePerm)
+  );
 
   const handleLogout = () => {
     logout();
@@ -82,7 +86,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </Box>
 
       <VStack flex={1} align="stretch" py={4} px={3} spacing={1} overflowY="auto">
-        {NAV_ITEMS.map((item) => (
+        {visibleItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
