@@ -46,23 +46,27 @@ const CURRENT_COLOR = "#00D9C0";
 const COMPARE_COLOR = "#F59E0B";
 
 function mergePnlTrend(current: PnlResponse["trend"], compare: PnlResponse["trend"]) {
-  const map = new Map<string, Record<string, string | number>>();
-  current.forEach((d) => {
-    map.set(d.month, {
-      month: d.month,
-      bet_A: d.bet,
-      ratio_A: d.ratio,
-      payout_A: d.payout,
-    });
-  });
-  compare.forEach((d) => {
-    const ex = map.get(d.month) || { month: d.month };
-    ex.bet_B = d.bet;
-    ex.ratio_B = d.ratio;
-    ex.payout_B = d.payout;
-    map.set(d.month, ex);
-  });
-  return Array.from(map.values()).sort((a, b) => String(a.month).localeCompare(String(b.month)));
+  const maxLen = Math.max(current.length, compare.length);
+  const result: Record<string, string | number>[] = [];
+  for (let i = 0; i < maxLen; i++) {
+    const item: Record<string, string | number> = {
+      month: `第${i + 1}月`,
+    };
+    if (current[i]) {
+      item.month_A = current[i].month;
+      item.bet_A = current[i].bet;
+      item.ratio_A = current[i].ratio;
+      item.payout_A = current[i].payout;
+    }
+    if (compare[i]) {
+      item.month_B = compare[i].month;
+      item.bet_B = compare[i].bet;
+      item.ratio_B = compare[i].ratio;
+      item.payout_B = compare[i].payout;
+    }
+    result.push(item);
+  }
+  return result;
 }
 
 export default function Home() {
@@ -270,17 +274,17 @@ export default function Home() {
                               <>
                                 {d.ratio_A !== undefined && (
                                   <>
+                                    <Text fontSize="10px" color={CURRENT_COLOR} fontWeight={600}>
+                                      A · {d.month_A}
+                                    </Text>
                                     <HStack justify="space-between">
-                                      <HStack spacing={1}>
-                                        <Box w="8px" h="8px" borderRadius="2px" bg={CURRENT_COLOR} />
-                                        <Text fontSize="xs" color="#94a3b8">A 赔付率</Text>
-                                      </HStack>
+                                      <Text fontSize="xs" color="#94a3b8">赔付率</Text>
                                       <Text fontSize="xs" color={CURRENT_COLOR} fontWeight={700}>
                                         {(num(d.ratio_A) * 100).toFixed(2)}%
                                       </Text>
                                     </HStack>
                                     <HStack justify="space-between">
-                                      <Text fontSize="xs" color="#475569">A 投注额</Text>
+                                      <Text fontSize="xs" color="#475569">投注额</Text>
                                       <Text fontSize="xs" color="#e2e8f0" fontWeight={600}>
                                         {formatCompact(num(d.bet_A))}
                                       </Text>
@@ -290,17 +294,17 @@ export default function Home() {
                                 {d.ratio_B !== undefined && (
                                   <>
                                     <Box h="1px" w="100%" bg="rgba(30, 38, 64, 0.6)" my={1} />
+                                    <Text fontSize="10px" color={COMPARE_COLOR} fontWeight={600}>
+                                      B · {d.month_B}
+                                    </Text>
                                     <HStack justify="space-between">
-                                      <HStack spacing={1}>
-                                        <Box w="8px" h="8px" borderRadius="2px" bg={COMPARE_COLOR} />
-                                        <Text fontSize="xs" color="#94a3b8">B 赔付率</Text>
-                                      </HStack>
+                                      <Text fontSize="xs" color="#94a3b8">赔付率</Text>
                                       <Text fontSize="xs" color={COMPARE_COLOR} fontWeight={700}>
                                         {(num(d.ratio_B) * 100).toFixed(2)}%
                                       </Text>
                                     </HStack>
                                     <HStack justify="space-between">
-                                      <Text fontSize="xs" color="#475569">B 投注额</Text>
+                                      <Text fontSize="xs" color="#475569">投注额</Text>
                                       <Text fontSize="xs" color="#94a3b8" fontWeight={600}>
                                         {formatCompact(num(d.bet_B))}
                                       </Text>
@@ -369,8 +373,8 @@ export default function Home() {
 
             {compareMode ? (
               <ChartCard
-                title="用户层级分布（对比模式）"
-                subtitle="左右并排对比 A / B 时段结构变化"
+                title="投注额结构（对比模式）"
+                subtitle="左右并排对比 A / B 时段各层级投注额占比变化"
                 height={340}
                 rightAction={
                   <HStack spacing={2}>
@@ -500,7 +504,7 @@ export default function Home() {
                 </VStack>
               </ChartCard>
             ) : (
-              <ChartCard title="用户层级分布" subtitle="各层级投注额占比" height={340}>
+              <ChartCard title="投注额结构" subtitle="各层级投注额占比" height={340}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie

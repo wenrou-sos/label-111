@@ -65,23 +65,27 @@ const CURRENT_COLOR = "#00D9C0";
 const COMPARE_COLOR = "#F59E0B";
 
 function mergeTrend(a: PnlResponse["trend"], b: PnlResponse["trend"]) {
-  const map = new Map<string, Record<string, string | number>>();
-  a.forEach((d) => {
-    map.set(d.month, {
-      month: d.month,
-      bet_A: d.bet,
-      payout_A: d.payout,
-      ratio_A: d.ratio,
-    });
-  });
-  b.forEach((d) => {
-    const ex = map.get(d.month) || { month: d.month };
-    ex.bet_B = d.bet;
-    ex.payout_B = d.payout;
-    ex.ratio_B = d.ratio;
-    map.set(d.month, ex);
-  });
-  return Array.from(map.values()).sort((a, b) => String(a.month).localeCompare(String(b.month)));
+  const maxLen = Math.max(a.length, b.length);
+  const result: Record<string, string | number>[] = [];
+  for (let i = 0; i < maxLen; i++) {
+    const item: Record<string, string | number> = {
+      month: `第${i + 1}月`,
+    };
+    if (a[i]) {
+      item.month_A = a[i].month;
+      item.bet_A = a[i].bet;
+      item.payout_A = a[i].payout;
+      item.ratio_A = a[i].ratio;
+    }
+    if (b[i]) {
+      item.month_B = b[i].month;
+      item.bet_B = b[i].bet;
+      item.payout_B = b[i].payout;
+      item.ratio_B = b[i].ratio;
+    }
+    result.push(item);
+  }
+  return result;
 }
 
 export default function Profit() {
@@ -184,10 +188,11 @@ export default function Profit() {
               />
               <CompareStatCard
                 label="平台盈利"
-                currentValue={Math.abs(data.summary.netResult)}
-                prevValue={Math.abs(cmpData.summary.netResult)}
+                currentValue={data.summary.netResult}
+                prevValue={cmpData.summary.netResult}
                 unit="元"
                 accent={data.summary.netResult >= 0 ? "#22c55e" : "#ef4444"}
+                showSign
               />
             </SimpleGrid>
           ) : (
@@ -368,23 +373,23 @@ export default function Profit() {
                           <VStack spacing={1} align="stretch">
                             {d.bet_A !== undefined && (
                               <>
+                                <Text fontSize="10px" color={CURRENT_COLOR} fontWeight={600}>
+                                  A · {d.month_A}
+                                </Text>
                                 <HStack justify="space-between">
-                                  <HStack spacing={1}>
-                                    <Box w="8px" h="8px" borderRadius="2px" bg={CURRENT_COLOR} />
-                                    <Text fontSize="xs" color="#94a3b8">A 投注额</Text>
-                                  </HStack>
+                                  <Text fontSize="xs" color="#94a3b8">投注额</Text>
                                   <Text fontSize="xs" color="#e2e8f0" fontWeight={700}>
                                     {formatCurrency(num(d.bet_A))}
                                   </Text>
                                 </HStack>
                                 <HStack justify="space-between">
-                                  <Text fontSize="xs" color="#475569" pl={3}>A 派彩</Text>
+                                  <Text fontSize="xs" color="#475569" pl={3}>派彩</Text>
                                   <Text fontSize="xs" color="#8B5CF6" fontWeight={700}>
                                     {formatCurrency(num(d.payout_A))}
                                   </Text>
                                 </HStack>
                                 <HStack justify="space-between">
-                                  <Text fontSize="xs" color="#475569" pl={3}>A 赔付率</Text>
+                                  <Text fontSize="xs" color="#475569" pl={3}>赔付率</Text>
                                   <Text
                                     fontSize="xs"
                                     color={getStatusColor(num(d.ratio_A))}
@@ -398,23 +403,23 @@ export default function Profit() {
                             {d.bet_B !== undefined && (
                               <>
                                 <Box h="1px" w="100%" bg="rgba(30, 38, 64, 0.6)" my={1} />
+                                <Text fontSize="10px" color={COMPARE_COLOR} fontWeight={600}>
+                                  B · {d.month_B}
+                                </Text>
                                 <HStack justify="space-between">
-                                  <HStack spacing={1}>
-                                    <Box w="8px" h="8px" borderRadius="2px" bg={COMPARE_COLOR} />
-                                    <Text fontSize="xs" color="#94a3b8">B 投注额</Text>
-                                  </HStack>
+                                  <Text fontSize="xs" color="#94a3b8">投注额</Text>
                                   <Text fontSize="xs" color="#94a3b8" fontWeight={700}>
                                     {formatCurrency(num(d.bet_B))}
                                   </Text>
                                 </HStack>
                                 <HStack justify="space-between">
-                                  <Text fontSize="xs" color="#475569" pl={3}>B 派彩</Text>
+                                  <Text fontSize="xs" color="#475569" pl={3}>派彩</Text>
                                   <Text fontSize="xs" color="#8B5CF6" fontWeight={700}>
                                     {formatCurrency(num(d.payout_B))}
                                   </Text>
                                 </HStack>
                                 <HStack justify="space-between">
-                                  <Text fontSize="xs" color="#475569" pl={3}>B 赔付率</Text>
+                                  <Text fontSize="xs" color="#475569" pl={3}>赔付率</Text>
                                   <Text
                                     fontSize="xs"
                                     color={getStatusColor(num(d.ratio_B))}

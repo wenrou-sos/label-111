@@ -347,16 +347,30 @@ export function CompareStatCard({
   prevValue,
   unit,
   accent,
+  showSign = false,
 }: {
   label: string;
   currentValue: number;
   prevValue: number;
   unit: string;
   accent: string;
+  showSign?: boolean;
 }) {
   const delta = computeDeltaPct(currentValue, prevValue);
   const isPositive = delta >= 0;
   const isZero = prevValue === 0 && currentValue === 0;
+  const currentSign = showSign && currentValue > 0 ? "+" : "";
+  const prevSign = showSign && prevValue > 0 ? "+" : "";
+  const currentColor = showSign
+    ? currentValue >= 0
+      ? "#22c55e"
+      : "#ef4444"
+    : "#e2e8f0";
+  const prevColor = showSign
+    ? prevValue >= 0
+      ? "#22c55e"
+      : "#ef4444"
+    : "#94a3b8";
 
   return (
     <Card
@@ -408,10 +422,11 @@ export function CompareStatCard({
               <Text
                 fontSize="2xl"
                 fontWeight={800}
-                color="#e2e8f0"
+                color={currentColor}
                 fontFamily='"JetBrains Mono", monospace'
               >
-                {formatCompareValue(currentValue, unit)}
+                {currentSign}
+                {formatCompareValue(Math.abs(currentValue), unit)}
               </Text>
               <Text fontSize="xs" color="#64748b">
                 {unit === "%" ? "" : unit}
@@ -460,10 +475,11 @@ export function CompareStatCard({
               <Text
                 fontSize="2xl"
                 fontWeight={800}
-                color="#94a3b8"
+                color={prevColor}
                 fontFamily='"JetBrains Mono", monospace'
               >
-                {formatCompareValue(prevValue, unit)}
+                {prevSign}
+                {formatCompareValue(Math.abs(prevValue), unit)}
               </Text>
               <Text fontSize="xs" color="#475569">
                 {unit === "%" ? "" : unit}
